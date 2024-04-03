@@ -1,0 +1,43 @@
+{
+  "name": "@stansom/usher",
+  "version": "0.1.4",
+  "description": "A simple routing library for JS",
+  "main": "./dist/usher.js",
+  "scripts": {
+    "build": "npx tsc && npx webpack build",
+    "test": "jest ./src/test/*.test.ts"
+  },
+  "types": "./dist/ts/index.d.ts",
+  "keywords": [
+    "routing",
+    "route",
+    "router",
+    "path",
+    "url",
+    "react",
+    "node",
+    "simple"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "author": "Stansom",
+  "license": "ISC",
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@types/jest": "^29.5.12",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.4.3",
+    "webpack": "^5.91.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "module": "./dist/usher.js",
+  "directories": {
+    "example": "examples"
+  },
+  "dependencies": {
+  }
+}
