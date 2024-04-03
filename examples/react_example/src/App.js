@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { routeSync } from "usher";
+import { routeSync } from "@stansom/usher";
 import * as routing from "./routing";
 
 import { Main } from "./routes/main";
