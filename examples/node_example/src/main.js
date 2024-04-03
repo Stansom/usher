@@ -1,4 +1,4 @@
-const { route } = require("usher");
+const { route } = require("@stansom/usher");
 const { createServer } = require("node:http");
 const { HomeRoute } = require("./routes/main");
 const { UserRoute } = require("./routes/user");
