@@ -14,19 +14,13 @@ function splitRoute(rt: string): RegExp {
   const ret = pt
     .map((s, i) => {
       if (s.startsWith(":") && !s.endsWith("?")) {
-        if (i === pt.length - 1) {
-          return "/.*";
-        }
-        return "/.*?/";
+        return "/.+";
       } else if (s.startsWith(":") && s.endsWith("?")) {
-        if (i === pt.length - 1) {
-          return "(/.*)?";
-        }
-        return "(/.*)*/";
+        return "(/.*)";
       } else if (i === 0) {
         return "^/" + s;
       } else {
-        return `${s}`;
+        return s;
       }
     })
     .join("");
@@ -87,13 +81,8 @@ function juxtPaths(route: string, path: string) {
     }
     if (item.startsWith(":") && item.endsWith("?")) {
       ++optionalMatches;
-      // if (routeMatch && !routeMatch[optionalMatches]) {
-      //   const oldItem = p[index];
-      //   p[index] = "";
-      //   p[index + 1] = oldItem;
-      // }
       const matchedValue =
-        routeMatch && routeMatch[optionalMatches]?.substring(1);
+        routeMatch && routeMatch[optionalMatches]?.replace(/\/+/g, "");
       const key = item.substring(1).substring(0, item.length - 2);
       const value = matchedValue || null;
       return {
@@ -128,24 +117,17 @@ async function routeOne(
   const juxt = juxtPaths(routeObject.path, pathObject.path).filter(isObject);
   const params = Object.assign({}, ...juxt);
 
-  if (routeObject.methods) {
-    if (pathObject.method) {
-      return await routeObject.methods[pathObject.method](params);
-    }
-    // return await routeObject.methods[pathObject.method](params);
+  if (routeObject.methods && pathObject.method) {
+    return await routeObject.methods[pathObject.method](params);
   }
-  return routeObject.response
-    ? routeObject.response(params)
-    : { status: 404, body: "Not found" };
+  return routeObject.response && routeObject.response(params);
 }
 
 function routeOneSync(routeObject: IRoute, pathObject: IPath): IResponse {
   const juxt = juxtPaths(routeObject.path, pathObject.path).filter(isObject);
   const params = Object.assign({}, ...juxt);
 
-  return routeObject.response
-    ? routeObject.response(params)
-    : { status: 404, body: "Not found" };
+  return routeObject.response && routeObject.response(params);
 }
 
 /**
