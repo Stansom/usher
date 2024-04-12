@@ -145,53 +145,6 @@ describe("routeSync", () => {
     expect(actualResponse2).toEqual(expectedResponse2);
   });
 
-  it("should handle routes with optional parameters correctly", () => {
-    const routes: IRoute[] = [
-      {
-        path: "/users/:id?",
-        response: (params) => {
-          if (params.id) {
-            return {
-              status: 200,
-              body: `User ${params.id} found`,
-            };
-          } else {
-            return {
-              status: 200,
-              body: "All users found",
-            };
-          }
-        },
-      },
-    ];
-
-    const pathObject1: IPath = {
-      path: "/users",
-      method: "GET",
-    };
-
-    const pathObject2: IPath = {
-      path: "/users/123",
-      method: "GET",
-    };
-
-    const expectedResponse1: IResponse = {
-      status: 200,
-      body: "All users found",
-    };
-
-    const expectedResponse2: IResponse = {
-      status: 200,
-      body: "User 123 found",
-    };
-
-    const actualResponse1 = routeSync(routes, pathObject1);
-    const actualResponse2 = routeSync(routes, pathObject2);
-
-    expect(actualResponse1).toEqual(expectedResponse1);
-    expect(actualResponse2).toEqual(expectedResponse2);
-  });
-
   // Should handle routes with multiple parameters correctly
   it("should handle routes with multiple parameters correctly", () => {
     const routes: IRoute[] = [
@@ -271,7 +224,8 @@ describe("route function", () => {
         path: "/users/:id",
         methods: {
           GET: (params) => {
-            return { status: 200, body: `User ${params.id} found` };
+            params;
+            return { status: 200, body: `User ${params.pathParams.id} found` };
           },
         },
       },
@@ -304,5 +258,52 @@ describe("route function", () => {
     const result = await route(routes, pathObject);
 
     expect(result).toEqual({ status: 200, body: "Empty route" });
+  });
+
+  it("should handle routes with optional parameters correctly", async () => {
+    const routes: IRoute[] = [
+      {
+        path: "/users/:id?",
+        response: (req) => {
+          if (req.pathParams.id) {
+            return {
+              status: 200,
+              body: `User ${req.pathParams.id} found`,
+            };
+          } else {
+            return {
+              status: 200,
+              body: "All users found",
+            };
+          }
+        },
+      },
+    ];
+
+    const pathObject1: IPath = {
+      path: "/users",
+      method: "GET",
+    };
+
+    const pathObject2: IPath = {
+      path: "/users/123",
+      method: "GET",
+    };
+
+    const expectedResponse1: IResponse = {
+      status: 200,
+      body: "All users found",
+    };
+
+    const expectedResponse2: IResponse = {
+      status: 200,
+      body: "User 123 found",
+    };
+
+    const actualResponse1 = await route(routes, pathObject1);
+    const actualResponse2 = await route(routes, pathObject2);
+
+    expect(actualResponse1).toEqual(expectedResponse1);
+    expect(actualResponse2).toEqual(expectedResponse2);
   });
 });

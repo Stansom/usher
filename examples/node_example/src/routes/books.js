@@ -1,4 +1,4 @@
-function BooksRouteGet(params) {
+function BooksRouteGet({ pathParams: params }) {
   if (params.id && params.commentId) {
     return {
       status: 200,
@@ -28,11 +28,11 @@ function BooksRouteGet(params) {
   };
 }
 
-function BooksRoutePost(params) {
+function BooksRoutePost({ pathParams: params }) {
   if (params.id && params.commentId) {
     return {
       status: 200,
-      body: `A book ${params.id} with comment ${params.commentId} was created`,
+      body: `The book ${params.id} with comment ${params.commentId} has been added`,
       headers: ["Content-Type", "text/plain"],
     };
   }

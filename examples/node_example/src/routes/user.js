@@ -1,4 +1,4 @@
-function UserRoute(params) {
+function UserRoute({ pathParams: params }) {
   if (params.id) {
     return {
       status: 200,

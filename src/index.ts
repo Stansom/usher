@@ -1,4 +1,4 @@
-import type { IRoute, IPath, IResponse } from "./types";
+import type { IRoute, IResponse, IRequest } from "./types";
 
 /**
  * Splits a route string into a regular expression pattern.
@@ -13,15 +13,13 @@ function splitRoute(rt: string): RegExp {
   }
   const ret = pt
     .map((s, i) => {
-      if (s.startsWith(":") && !s.endsWith("?")) {
-        return "/.+";
-      } else if (s.startsWith(":") && s.endsWith("?")) {
-        return "(/.*)";
-      } else if (i === 0) {
-        return "^/" + s;
-      } else {
-        return s;
-      }
+      return s.startsWith(":") && !s.endsWith("?")
+        ? "([^/]+/?)"
+        : s.startsWith(":") && s.endsWith("?")
+        ? "([^/]*/?)"
+        : i === 0
+        ? `^/${s}/?`
+        : `${s}/?`;
     })
     .join("");
   return new RegExp(ret, "g");
@@ -58,6 +56,10 @@ function match(route: string, path: string) {
   return sr.test(sp);
 }
 
+function processExtractedValue(value: string) {
+  return value?.replace(/\/+/g, "").trim();
+}
+
 /**
  * Returns an array of params extracted from the given route and path.
  *
@@ -67,22 +69,24 @@ function match(route: string, path: string) {
  */
 function juxtPaths(route: string, path: string) {
   const r = route.split("/").filter((s) => s.length > 0);
-  const p = path
-    .replace(/\/+/g, "/")
-    .split("/")
-    .filter((s) => s.length > 0);
   const routeRegex = splitRoute(route);
   const routeMatch = routeRegex.exec(path);
-  let optionalMatches = 0;
+  let parametersCount = 0;
 
   return r.map((item, index) => {
     if (item.startsWith(":") && !item.endsWith("?")) {
-      return { [item.substring(1)]: p[index] };
+      ++parametersCount;
+      return {
+        [item.substring(1)]: processExtractedValue(routeMatch[parametersCount]),
+      };
     }
     if (item.startsWith(":") && item.endsWith("?")) {
-      ++optionalMatches;
-      const matchedValue =
-        routeMatch && routeMatch[optionalMatches]?.replace(/\/+/g, "");
+      ++parametersCount;
+      let matchedValue =
+        routeMatch && processExtractedValue(routeMatch[parametersCount]);
+      const match = matchedValue.match(/^[^ ].*/);
+      matchedValue = match && match[0];
+
       const key = item.substring(1).substring(0, item.length - 2);
       const value = matchedValue || null;
       return {
@@ -104,64 +108,73 @@ function isObject(entity: unknown) {
 }
 
 /**
- * Asynchronously routes a request based on the provided route and path objects, calls the corresponding method in the route object with the extracted params, and returns the response.
+ * Asynchronously routes a request based on the provided route and request object, calls the corresponding method in the route object with the extracted params from the url, and returns the response.
  *
  * @param {IRoute} routeObject - The route object containing information about the route.
- * @param {IPath} pathObject - The path object containing information about the path.
+ * @param {IPath} request - The path object containing information about the path.
  * @return {IResponse} The response object from the routed request.
  */
 async function routeOne(
   routeObject: IRoute,
-  pathObject: IPath
+  request: IRequest
 ): Promise<IResponse> {
-  const juxt = juxtPaths(routeObject.path, pathObject.path).filter(isObject);
-  const params = Object.assign({}, ...juxt);
+  const juxt = juxtPaths(routeObject.path, request.path || request.url).filter(
+    isObject
+  );
+  const params = { ...request, pathParams: Object.assign({}, ...juxt) };
 
-  if (routeObject.methods && pathObject.method) {
-    return await routeObject.methods[pathObject.method](params);
+  if (routeObject.methods && request.method) {
+    const resp = await routeObject.methods[request.method](params);
+    return resp;
   }
   return routeObject.response && routeObject.response(params);
 }
 
-function routeOneSync(routeObject: IRoute, pathObject: IPath): IResponse {
-  const juxt = juxtPaths(routeObject.path, pathObject.path).filter(isObject);
+function routeOneSync(routeObject: IRoute, request: IRequest): IResponse {
+  const juxt = juxtPaths(routeObject.path, request.path || request.url).filter(
+    isObject
+  );
   const params = Object.assign({}, ...juxt);
 
   return routeObject.response && routeObject.response(params);
 }
 
 /**
- * Routes the given path object to the appropriate route based on the provided routes and method.
+ * Routes the given request to the appropriate route based on the provided uri and method.
  *
  * @param {IRoute[]} routes - An array of route objects representing the available routes.
- * @param {IPath} pathObject - The path object containing the path and method to be routed.
+ * @param {IRequest} pathObject - The path object containing the path and method to be routed.
  * @return {Promise<IResponse>} A promise that resolves to the response object for the routed path.
  */
 export async function route(
   routes: IRoute[],
-  pathObject: IPath
+  request: IRequest
 ): Promise<IResponse> {
+  const url = request.url || request.path || "";
+  const notFound = { status: 404, body: "Not found" };
+
+  if (!url && url !== "") return notFound;
+
   const rt = routes.find(
     (r) =>
-      match(r.path, pathObject.path) &&
+      match(r.path, url) &&
       (r.methods
-        ? r.methods[pathObject.method!]
+        ? r.methods[request.method!]
         : typeof r.response === "function")
   );
 
-  if (rt) {
-    return await routeOne(rt, pathObject);
-  }
-  return { status: 404, body: "Not found" };
+  return rt ? await routeOne(rt, request) : notFound;
 }
 
-export function routeSync(routes: IRoute[], pathObject: IPath): IResponse {
+export function routeSync(routes: IRoute[], request: IRequest): IResponse {
+  const url = request.url || request.path || "";
+  const notFound = { status: 404, body: "Not found" };
+
+  if (!url && url !== "") return notFound;
+
   const rt = routes.find((r) => {
-    return match(r.path, pathObject.path) && r.response;
+    return match(r.path, url) && r.response;
   });
 
-  if (rt) {
-    return routeOneSync(rt, pathObject);
-  }
-  return { status: 404, body: "Not found" };
+  return rt ? routeOneSync(rt, request) : notFound;
 }

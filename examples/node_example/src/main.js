@@ -32,7 +32,7 @@ const serverPort = 3030;
 const server = createServer(async (req, res) => {
   const { url, method } = req;
 
-  const { status, body, headers } = await route(routes, { path: url, method });
+  const { status, body, headers } = await route(routes, req);
 
   res.statusCode = status;
   res.setHeader(...(headers || "Content-Type"), "text/plain");

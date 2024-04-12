@@ -4,8 +4,8 @@
 
 There are two main functions for controlling your routes:
 
-- `route(routesArray, path)` is the async version of the route function
-- `routeSync(routesArray, path)` is the same function, but sync
+- `route(routesArray, request)` is the async version of the route function
+- `routeSync(routesArray, request)` is the same function, but sync
 - **routesArray** is an array of routes objects, <br>
   the objects are in the form: <br>
 
@@ -13,14 +13,14 @@ There are two main functions for controlling your routes:
 {
    path: '/some/route/',
    methods?: {
-       GET: (params) => ({
+       GET: ({ pathParams: params }) => ({
             status: 200,
             body: `Hi ${params.name}!`}),
        POST: (params) => ({
             status: 200,
             body: "The user has been added!"}),
    },
-   response?: (params) =>
+   response?: ({ pathParams: params }) =>
         <><h1>Hello from the browser</h1></>
 }
 ```
@@ -31,18 +31,19 @@ Where:
 - **methods** is an optional object, used mainly on the server side, it contains method name and function to respond. <br>
   The methods can be: "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "PATCH"
 - **response** is an optional function, it's commonly used for frontend.
-- **params** that are passed to the response functions are extracted from a route based on a given path, for example: <br>
+- **pathParams** that are passed to the response functions are extracted from a route based on a given path, for example: <br>
   > "/user/:name" extracts the :name from the "/user/john" route and passes it to the response function, so it can be used like this: <br>
   >
   > ```javascript
-  > (params) => `Hello, user ${params.name}. And welcome to the site.`;
+  > (request) =>
+  >   `Hello, user ${request.pathParams.name}. And welcome to the site.`;
   > // returns "Hello, user john. And welcome to the site.
   > ```
   >
   > "/user/:name/:surname?" where surname is an optional parameter, the route function will try to match it and if not will return the param with a null value.
   >
   > ```javascript
-  > (params) => {
+  > ({ pathParams: params }) => {
   >   return `Hello ${params.name}${
   >     params.surname ? ` with surname ${params.surname}` : "."
   >   }`;
@@ -71,7 +72,7 @@ Where:
 >   {
 >     path: "/user/:id",
 >     methods: {
->       GET: ({ id }) => {
+>       GET: ({ pathParams: { id } }) => {
 >         return {
 >           status: 200,
 >           body: `Hi user ${id}! How are you doing?`,
@@ -82,7 +83,7 @@ Where:
 > ];
 > ```
 >
-> path is an object in that form:
+> request is an object in that form:
 >
 > ```javascript
 > const request = {
@@ -129,7 +130,7 @@ Where:
 > ];
 > ```
 >
-> path is an object in that form:
+> request is an object in that form:
 >
 > ```javascript
 > const request = {
