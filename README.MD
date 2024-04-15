@@ -146,6 +146,24 @@ Where:
 > // "Book 55 found, you can read it.",
 > ```
 
+the route also can be a wildcard `*` and the route function will return the wildcard value this way: <br>
+
+```javascript
+route(
+  [
+    {
+      route: "/main/:test*",
+      handlers: { GET: (req) => `wildcard ${req.pathParams.test}` },
+    },
+  ],
+  {
+    url: "/main/test/some/string",
+    method: "GET",
+  }
+);
+// returns "wildcard test/some/string"
+```
+
 ---
 
 ## SUMMARY:

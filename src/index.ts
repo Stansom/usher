@@ -1,25 +1,33 @@
 import type { IRoute, IResponse, IRequest } from "./types";
 
 /**
- * Splits a route string into a regular expression pattern.
+ * Produces a regular expression from the given route string.
  *
  * @param {string} rt - The route string to split.
  * @return {RegExp} The regular expression pattern generated from the route string.
+ * @example `pathToRegex("/foo/:id?")` returns /foo/([^/]+)?
+ * @example `pathToRegex("/foo/:id")` returns /foo/([^/]+)
+ * @example `pathToRegex("/:foo*")` returns /(.*)?
  */
-function splitRoute(rt: string): RegExp {
+function pathToRegex(rt: string): RegExp {
   const pt = rt.split("/").filter((s) => s.length > 0);
   if (rt.length === 0 || pt.length === 0) {
     return new RegExp("^/$", "g");
   }
+
+  if (rt.includes("*")) {
+    return new RegExp(rt.replace(/\:.*?\*/, "(.*)?"), "g");
+  }
+
   const ret = pt
     .map((s, i) => {
       return s.startsWith(":") && !s.endsWith("?")
         ? "([^/]+/?)"
         : s.startsWith(":") && s.endsWith("?")
-        ? "([^/]*/?)"
-        : i === 0
-        ? `^/${s}/?`
-        : `${s}/?`;
+          ? "([^/]*/?)"
+          : i === 0
+            ? `^/${s}/?`
+            : `${s}/?`;
     })
     .join("");
   return new RegExp(ret, "g");
@@ -30,6 +38,7 @@ function splitRoute(rt: string): RegExp {
  *
  * @param {string} route - The route path to be split.
  * @return {string} The modified route path with "/" added at the beginning and end.
+ * @example `splitPath("/foo/bar")` returns /foo/bar/
  */
 function splitPath(route: string) {
   if (route === "/" || route === "") {
@@ -48,14 +57,23 @@ function splitPath(route: string) {
  * @param {string} route - The route to match.
  * @param {string} path - The path to match against the route.
  * @return {boolean} Returns true if the path matches the route, false otherwise.
+ * @example `match("/test/:id", "/test/444")` returns true
+ * @example `match("/test/:id", "/test")` returns false
  */
 function match(route: string, path: string) {
   const sp = splitPath(path);
-  const sr = splitRoute(route);
+  const sr = pathToRegex(route);
 
   return sr.test(sp);
 }
 
+/**
+ * Returns the extracted value from the given string, removes slashes and whitespaces.
+ *
+ * @param value {string} The string to process.
+ * @return {string} The processed value.
+ * @example `processExtractedValue("/foo     ")` returns foo
+ */
 function processExtractedValue(value: string) {
   return value?.replace(/\/+/g, "").trim();
 }
@@ -66,18 +84,29 @@ function processExtractedValue(value: string) {
  * @param {string} route - The route string containing path segments.
  * @param {string} path - The path string to extract values from.
  * @return {Array} An array of values extracted from the route and path.
+ * @example `extractParams("/foo/:id/:name?", "/foo/444/john")` returns {id: 444, name: "john"}
+ * @example `extractParams("/foo/:id/:name?", "/foo/444")` returns {id: 444, name: null}
  */
-function juxtPaths(route: string, path: string) {
+function extractParams(route: string, path: string) {
   const r = route.split("/").filter((s) => s.length > 0);
-  const routeRegex = splitRoute(route);
+  const routeRegex = pathToRegex(route);
   const routeMatch = routeRegex.exec(path);
   let parametersCount = 0;
 
-  return r.map((item, index) => {
+  return r.map((item) => {
+    if (item.includes("*")) {
+      ++parametersCount;
+      const key = item.substring(1, item.length - 1);
+      const val = routeMatch[parametersCount];
+
+      return { [key]: val };
+    }
     if (item.startsWith(":") && !item.endsWith("?")) {
       ++parametersCount;
+      const key = item.substring(1);
+      const val = processExtractedValue(routeMatch[parametersCount]);
       return {
-        [item.substring(1)]: processExtractedValue(routeMatch[parametersCount]),
+        [key]: val,
       };
     }
     if (item.startsWith(":") && item.endsWith("?")) {
@@ -93,18 +122,7 @@ function juxtPaths(route: string, path: string) {
         [key]: value,
       };
     }
-    return item;
   });
-}
-
-/**
- * Check if the input entity is an object.
- *
- * @param {unknown} entity - the entity to be checked
- * @return {boolean} true if the entity is an object, false otherwise
- */
-function isObject(entity: unknown) {
-  return entity && typeof entity === "object" && !Array.isArray(entity);
 }
 
 /**
@@ -113,15 +131,21 @@ function isObject(entity: unknown) {
  * @param {IRoute} routeObject - The route object containing information about the route.
  * @param {IPath} request - The path object containing information about the path.
  * @return {IResponse} The response object from the routed request.
+ * @example `routeOne({path: "/foo/:id", methods: {GET: () => ({status: 200, body: "foo"})}}, {url: "/foo/444"})`
+ * returns {status: 200, body: "foo"}
  */
 async function routeOne(
   routeObject: IRoute,
   request: IRequest
 ): Promise<IResponse> {
-  const juxt = juxtPaths(routeObject.path, request.path || request.url).filter(
-    isObject
+  const extractedParams = extractParams(
+    routeObject.path,
+    request.path || request.url
   );
-  const params = { ...request, pathParams: Object.assign({}, ...juxt) };
+  const params = {
+    ...request,
+    pathParams: Object.assign({}, ...extractedParams),
+  };
 
   if (routeObject.methods && request.method) {
     const resp = await routeObject.methods[request.method](params);
@@ -131,10 +155,11 @@ async function routeOne(
 }
 
 function routeOneSync(routeObject: IRoute, request: IRequest): IResponse {
-  const juxt = juxtPaths(routeObject.path, request.path || request.url).filter(
-    isObject
+  const extractedParams = extractParams(
+    routeObject.path,
+    request.path || request.url
   );
-  const params = Object.assign({}, ...juxt);
+  const params = Object.assign({}, ...extractedParams);
 
   return routeObject.response && routeObject.response(params);
 }

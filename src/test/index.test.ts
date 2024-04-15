@@ -306,4 +306,29 @@ describe("route function", () => {
     expect(actualResponse1).toEqual(expectedResponse1);
     expect(actualResponse2).toEqual(expectedResponse2);
   });
+  it("should handle wildcard routes correctly", async () => {
+    const routes: IRoute[] = [
+      {
+        path: "/user/:user*",
+        methods: {
+          GET: (req) => {
+            return {
+              body: `The wildcard params are ${req.pathParams.user}`,
+              status: 200,
+            };
+          },
+        },
+      },
+    ];
+    const response = await route(routes, {
+      url: "/user/all/wildcard/goes/here",
+      method: "GET",
+    });
+    const expectedResponse = {
+      status: 200,
+      body: "The wildcard params are all/wildcard/goes/here",
+    };
+
+    expect(response).toEqual(expectedResponse);
+  });
 });
